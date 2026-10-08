@@ -1,0 +1,14 @@
+*.sv text eol=lf
+*.svh text eol=lf
+*.v text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.f text eol=lf
+*.c text eol=lf
+*.S text eol=lf
+*.ld text eol=lf
+*.md text eol=lf
+*.hex text eol=lf
+*.json text eol=lf
+# Preserve imported source bytes and their SOURCE_MANIFEST.json checksums.
+third_party/** -text
