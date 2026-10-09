@@ -7,6 +7,8 @@ module mynpu_soc_top #(
     parameter integer NPU_SRAM_BYTES = 8192,
     parameter integer NPU_LANES = 8,
     parameter integer NPU_IRQ_ID = 16,
+    parameter bit USE_FPGA_BRAM = 1'b0,
+    parameter bit USE_ASIC_SRAM = 1'b0,
     parameter CPU_INIT_FILE = "",
     parameter NPU_INIT_FILE = ""
 ) (
@@ -420,7 +422,8 @@ module mynpu_soc_top #(
   logic [31:0] sram_rdata;
 
   mynpu_sram #(
-      .SRAM_BYTES(CPU_SRAM_BYTES), .INIT_FILE(CPU_INIT_FILE)
+      .SRAM_BYTES(CPU_SRAM_BYTES), .INIT_FILE(CPU_INIT_FILE),
+      .FPGA_BRAM(USE_FPGA_BRAM), .ASIC_MACRO(USE_ASIC_SRAM)
   ) i_mainmem (
       .clk_i  (clk_i),
       .rst_ni (ndmreset_n),

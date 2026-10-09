@@ -66,6 +66,7 @@ third_party/lab3/cpu_cv32e40p/rtl/cv32e40p_cs_registers.sv
 third_party/lab3/cpu_cv32e40p/rtl/cv32e40p_core.sv
 third_party/lab3/cpu_cv32e40p/rtl/cv32e40p_top.sv
 rtl/mynpu_soc_pkg.sv
+rtl/mynpu_sram_2048x32_fpga.sv
 rtl/mynpu_sram.sv
 cnn_npu_int8/rtl/cnn_npu_top.sv
 cnn_npu_int8/rtl/cnn_npu_subsystem.sv
