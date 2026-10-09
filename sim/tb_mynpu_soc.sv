@@ -1,7 +1,8 @@
 `timescale 1ns/1ps
 module tb_mynpu_soc #(
   parameter integer LANES = 8,
-  parameter integer NPU_SRAM_BYTES = 8192
+  parameter integer NPU_SRAM_BYTES = 8192,
+  parameter integer INFERENCE_RUNS = 5
 );
   localparam CPU_IMAGE = (NPU_SRAM_BYTES == 8192) ? "generated/8k/cpu.hex" : "generated/16k/cpu.hex";
   localparam GOLDEN_IMAGE = (NPU_SRAM_BYTES == 8192) ? "generated/8k/integer_layers.hex" : "generated/16k/integer_layers.hex";
@@ -34,7 +35,7 @@ module tb_mynpu_soc #(
   // Compare every layer before ping-pong buffers are reused by the next layer.
   always @(negedge clk) begin
     if (previous_state == 5 &&
-        (dut.i_npu_subsystem.i_core.state_q == 1 || dut.i_npu_subsystem.i_core.state_q == 6)) begin
+        (dut.i_npu_subsystem.g_functional.i_core.state_q == 1 || dut.i_npu_subsystem.g_functional.i_core.state_q == 6)) begin
       case (previous_layer)
         0: begin offset=0; count=392; end
         1: begin offset=392; count=784; end
@@ -45,7 +46,7 @@ module tb_mynpu_soc #(
         default: $fatal(1, "Invalid layer");
       endcase
       for (i=0;i<count;i++) begin
-        actual=dut.i_npu_subsystem.i_core.mem[dut.i_npu_subsystem.i_core.out_base_q+i];
+        actual=dut.i_npu_subsystem.g_functional.i_core.mem[dut.i_npu_subsystem.g_functional.i_core.out_base_q+i];
         if (actual !== golden[offset+i])
           $fatal(1, "Layer %0d byte %0d integer mismatch hw=%0d ref=%0d", previous_layer, i, actual, golden[offset+i]);
         delta=actual-integer'(pytorch_golden[offset+i]);
@@ -55,8 +56,8 @@ module tb_mynpu_soc #(
       layer_checks++;
       $display("[SOC] layer %0d exact integer + PyTorch delta <= 1: %0d bytes", previous_layer, count);
     end
-    previous_state=dut.i_npu_subsystem.i_core.state_q;
-    previous_layer=dut.i_npu_subsystem.i_core.layer_q;
+    previous_state=dut.i_npu_subsystem.g_functional.i_core.state_q;
+    previous_layer=dut.i_npu_subsystem.g_functional.i_core.layer_q;
   end
 
   task automatic tick(input bit ms, input bit di, output bit sample);
@@ -173,9 +174,9 @@ module tb_mynpu_soc #(
     wait(dut.i_mainmem.mem['h1fc0/4] === 32'hc0dec0de || dut.i_mainmem.mem['h1fc0/4] === 32'hdeadbeef);
     if (dut.i_mainmem.mem['h1fc0/4] === 32'hdeadbeef)
       $fatal(1,"CPU firmware failed code=%h",dut.i_mainmem.mem['h1fc4/4]);
-    if (layer_checks != 12 || irq_edges != 1 || dut.i_mainmem.mem['h1ff8/4] != 1)
+    if (layer_checks != 6*INFERENCE_RUNS || irq_edges != INFERENCE_RUNS-1 || dut.i_mainmem.mem['h1ff8/4] != INFERENCE_RUNS-1)
       $fatal(1,"Coverage mismatch layers=%0d irq=%0d handled=%0d",layer_checks,irq_edges,dut.i_mainmem.mem['h1ff8/4]);
-    $display("[SOC] PASS lanes=%0d npu_sram=%0d: CPU boot, JTAG/SBA, 12 exact layers, polling + CPU IRQ, cycles=%0d",LANES,NPU_SRAM_BYTES,dut.i_mainmem.mem['h1fcc/4]);
+    $display("[SOC] PASS lanes=%0d npu_sram=%0d: CPU boot, JTAG/SBA, %0d repeated runs (%0d exact layers), polling + CPU IRQ, cycles=%0d",LANES,NPU_SRAM_BYTES,INFERENCE_RUNS,layer_checks,dut.i_mainmem.mem['h1fcc/4]);
     $finish;
   end
   initial begin #50000000; $fatal(1,"Global SoC timeout"); end

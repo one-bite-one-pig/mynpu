@@ -1,8 +1,8 @@
 {
-  "checkpoint": "tiny_MNIST\\outputs\\pool-stride2-fp32-int8\\model_int8.pt",
+  "checkpoint": "model\\checkpoints\\model_int8.pt",
   "backend": "fbgemm",
   "sram_bytes": 16384,
-  "lanes": 16,
+  "lanes": 1,
   "descriptor_base": 12288,
   "activation_a": 8192,
   "activation_b": 10240,

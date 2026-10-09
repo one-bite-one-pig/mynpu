@@ -3,9 +3,9 @@
 This shell targets the XC7A35T EGo1 board. The board clock is 100 MHz on P17;
 the reset and LED pins are from the EGo1 V2.2 manual. Check the board revision
 and reset polarity before programming. The shell sets `LANES=1`, preloads the
-8KB CPU image, and uses a synchronous inferred BRAM for CPU SRAM. The current
-NPU core is still the functional multi-access array, so this shell is a CPU/
-SoC bring-up and connectivity test, not the final single-port-SRAM NPU.
+8KB CPU image, and uses synchronous inferred BRAM for both CPU and NPU SRAM.
+The NPU is the `LANES=1` single-port schedule, matching the storage timing
+used by the FPGA integration smoke test.
 
 Create a Vivado project with part `xc7a35tcsg324-1`, add the repository RTL
 listed in `sim/soc.f`, add this top and `ego1.xdc`, and add

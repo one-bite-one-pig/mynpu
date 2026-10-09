@@ -25,6 +25,7 @@ module mynpu_soc_top #(
 
   import mynpu_soc_pkg::*;
   logic [31:0] cpu_irq;
+  localparam integer NPU_MEM_BACKEND = USE_ASIC_SRAM ? 2 : (USE_FPGA_BRAM ? 1 : 0);
   assign cpu_irq = (32'd1 << NPU_IRQ_ID) & {32{npu_irq_o}};
 
   logic ndmreset;
@@ -483,7 +484,8 @@ module mynpu_soc_top #(
 
   cnn_npu_subsystem #(
       .LANES(NPU_LANES), .SRAM_BYTES(NPU_SRAM_BYTES),
-      .MAX_LAYERS(8), .SHARED_SRAM(1), .MEM_INIT_FILE(NPU_INIT_FILE)
+      .MAX_LAYERS(8), .SHARED_SRAM(1), .MEM_BACKEND(NPU_MEM_BACKEND),
+      .MEM_INIT_FILE(NPU_INIT_FILE)
   ) i_npu_subsystem (
       .clk_i  (clk_i),
       .rst_ni (ndmreset_n),

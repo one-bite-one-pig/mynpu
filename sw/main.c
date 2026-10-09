@@ -50,26 +50,30 @@ int main(void) {
     NPU[4]=DESC_BASE; NPU[5]=6u;
     load_input();
     NPU[0]=5u; /* clear previous state + start, no IRQ */
-    unsigned int limit=200000u, status=0;
+    unsigned int limit=2000000u, status=0;
     while (limit--) { status=NPU[1]; if (status & 6u) break; }
     if (!(status & 2u) || (status & 4u)) fail(1u);
     check_output(0u);
     NPU[0]=4u;
     if (NPU[1] & 2u) fail(2u);
 
-    /* A second run tests rewritten input and an actual CPU interrupt handler. */
-    load_input();
+    /* Four more runs test rewritten input, repeated DONE clearing and the
+       actual CPU interrupt handler. This catches stale ping-pong buffers and
+       a controller that only works for its first START. */
     unsigned int handler=(unsigned int)npu_handler;
     __asm__ volatile ("csrw mtvec, %0" :: "r"(handler));
     unsigned int irqmask=1u<<16;
     __asm__ volatile ("csrw mie, %0" :: "r"(irqmask));
     __asm__ volatile ("csrsi mstatus, 8");
-    NPU[0]=3u;
-    limit=200000u;
-    while (limit-- && irq_count==0u) { __asm__ volatile ("nop"); }
-    if (irq_count != 1u) fail(3u);
-    check_output(1u);
-    if (NPU[1] & 2u) fail(4u);
+    for (unsigned int run=1; run<=4; ++run) {
+        load_input();
+        NPU[0]=3u;
+        limit=2000000u;
+        while (limit-- && irq_count<run) { __asm__ volatile ("nop"); }
+        if (irq_count != run) fail(3u+run);
+        check_output(run);
+        if (NPU[1] & 2u) fail(8u+run);
+    }
     __asm__ volatile ("csrci mstatus, 8");
     MAIL[14]=irq_count;
     barrier(); MAIL[0]=0xc0dec0deu;

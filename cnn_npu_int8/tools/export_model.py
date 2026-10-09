@@ -201,6 +201,14 @@ def main():
     with hex_path.open("w", encoding="ascii") as f:
         for value in mem:
             f.write(f"{value:02x}\n")
+    # Word-packed image for the synchronous 2048x32 FPGA/ASIC SRAM backend.
+    # Each line is little-endian, matching the byte-addressed image above.
+    with (args.out_dir / "npu_word.hex").open("w", encoding="ascii") as f:
+        for address in range(0, len(mem), 4):
+            f.write(f"{int.from_bytes(mem[address:address+4], 'little'):08x}\n")
+    with (args.out_dir / "input_codes.hex").open("w", encoding="ascii") as f:
+        for value in input_codes:
+            f.write(f"{value:02x}\n")
 
     golden = {
         "checkpoint": str(args.checkpoint),

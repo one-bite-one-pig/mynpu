@@ -10,7 +10,7 @@
 | 8KB | 8KB | 8 | PASS | 10704 |
 | 8KB | 16KB | 16 | PASS | 9882 |
 
-每项包含 JTAG IDCODE、DMI/SBA 读写 CPU/NPU SRAM、真实 CPU 启动、halt/x31 读写及恢复、两轮六层推理、第一轮轮询、第二轮中断处理和清中断。每层全部 1794 个输出 byte 对独立整数参考严格相等；每轮也对 PyTorch 的逐层 code 检查绝对差 ≤1。测试要求 IRQ 恰好产生一次、CPU handler 恰好处理一次，最终 mailbox 为 `0xc0dec0de`。
+每项包含 JTAG IDCODE、DMI/SBA 读写 CPU/NPU SRAM、真实 CPU 启动、halt/x31 读写及恢复、五轮六层推理、第一轮轮询、后四轮中断处理和清中断。CPU 每轮重新写入 784-byte 输入，testbench 在每轮的每一层都检查输出，合计 30 个 layer checkpoint、8970 个 output byte；每个 byte 对独立整数参考严格相等，并检查与 PyTorch code 的绝对差 ≤1。测试要求 IRQ 恰好产生四次、CPU handler 恰好处理四次，最终 mailbox 为 `0xc0dec0de`。`sim/tb_mynpu_soc.sv` 的 `INFERENCE_RUNS` 参数默认是 5，必须与固件的重复次数保持一致。
 
 周期计数不含 CPU 加载参数/输入、JTAG 操作或读回结果的开销。它来自当前多访问功能数组后端，换成同步 SRAM 后必须重测。提高 LANES 到 16 收益有限，因为前四层输出通道数均 ≤8，尾层通道余数也影响利用率。
 
@@ -41,4 +41,6 @@ checkpoint 的元数据记录 FP32 accuracy=99.07%、INT8 accuracy=99.01%、下�
 
 VCS 启动时出现原 CPU `unique case` 在 time 0 未匹配的 warning，复位后自测通过。测试编译定义 `SYNTHESIS`，用于避开原项目中非必要的仿真辅助逻辑；新增 testbench 的断言、逐层比较和 CPU 自测仍实际执行。Vivado 2023.2 XSim elaboration 失败于原 AXI 的 `default disable iff`，未将其列为通过的后端。
 
-尚未覆盖大量随机输入、全 MNIST 测试集、异常 descriptor、AXI 随机压力、多 hart、真实探针、FPGA 或物理 SRAM 宏。FBGEMM bit-exact、单物理 SRAM 共享、面积/功耗/最高频率也尚未完成。
+`sim/tb_cnn_npu_sp.sv` 另外用 FPGA BRAM 后端连续运行 5 次，重新装载输入并检查 10 个 FC 输出，报告 474675 次状态轮询和 284802 个 NPU cycle。`sim/tb_mynpu_soc_fpga.sv` 在 VCS 中用 CPU BRAM + NPU 单端口 BRAM 跑同一份五轮固件；已通过，NPU cycle 为 284802。ASIC wrapper 已用课程提供的 RA1SHD Verilog model 完成 VCS 编译检查；该模型包含大量 timing checks，完整仿真需要在 PDK/宏仿真环境中按实际时钟约束运行，公开仓库不携带该 proprietary 文件。
+
+尚未覆盖大量随机输入、全 MNIST 测试集、异常 descriptor、AXI 随机压力、多 hart、真实探针、FPGA bitstream 下载或物理 SRAM 宏的 STA。FBGEMM bit-exact、面积/功耗/最高频率也尚未完成。

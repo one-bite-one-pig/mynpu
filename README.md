@@ -2,7 +2,7 @@
 
 本工程在独立目录中整合了 **CV32E40P CPU、3×4 AXI crossbar、原有 JTAG/Debug Module、Boot RAM、CPU SRAM 和 INT8 CNN NPU**。默认配置是 CPU 8KB + NPU 8KB，NPU 同时计算 8 个输出通道。原始 `lab3-ST` 未修改；复用源码保存在 `third_party/lab3`，新增集成顶层是 `rtl/mynpu_soc_top.sv`。
 
-这是已通过完整 SoC 功能仿真的 RTL 工程。NPU 存储目前是支持多个同拍访问的功能数组，尚未实现与实际单口/双口 SRAM 宏相符的访存控制，也未完成 FPGA 上板或 0.18µm 工艺综合、时序和物理签核。
+这是已通过完整 SoC 功能仿真和 FPGA BRAM 后端仿真的 RTL 工程。默认功能 backend 适合算法基线；`USE_FPGA_BRAM=1` 会同时替换 CPU/NPU 为同步单端口 BRAM 后端，`USE_ASIC_SRAM=1` 会同时替换为 RA1SHD wrapper，并由 `cnn_npu_sp_top` 采用逐拍单端口调度。尚未完成 FPGA bitstream 下载或 0.18µm 工艺综合、时序和物理签核。
 
 ## 架构
 
@@ -35,11 +35,16 @@ python3 tools/verify_assets.py
 python3 tools/run_sim.py --backend vcs --layout 8k --lanes 8
 python3 tools/run_sim.py --backend vcs --layout 16k --lanes 16
 python3 tools/run_sim.py --backend vcs --layout 8k --lanes 1
+# FPGA BRAM / single-port schedule regression (Icarus)
+iverilog -g2012 -s tb_cnn_npu_sp -o build/tb_cnn_npu_sp.vvp \
+  sim/tb_cnn_npu_sp.sv cnn_npu_int8/rtl/cnn_npu_sp_top.sv \
+  rtl/mynpu_sram_2048x32_fpga.sv
+vvp build/tb_cnn_npu_sp.vvp
 ```
 
 成功标志是 `[SOC] PASS`，脚本会检查该标志，不能只依据模拟器退出码判断成功。日志在 `build/vcs-<layout>-<lanes>/`。Vivado 2023.2 XSim 对原始 AXI 源码中的 `default disable iff` 不支持，因此当前验证使用 VCS。
 
-完整 testbench 通过真实 CPU 指令执行以下流程：JTAG SBA 读写两块 SRAM → CPU 启动 → JTAG 停机、读取/写入/恢复 x31 → CPU 加载模型并轮询推理 → 再次推理并进入机器中断处理程序。两轮推理每层都严格对照独立 Python 整数参考，同时逐元素检查与 PyTorch FBGEMM 的差值不超过 1。
+完整 testbench 通过真实 CPU 指令执行以下流程：JTAG SBA 读写两块 SRAM → CPU 启动 → JTAG 停机、读取/写入/恢复 x31 → CPU 加载模型并进行第一轮轮询推理 → 连续四轮重新装载输入、启动、处理中断并清除 DONE。五轮推理每层都严格对照独立 Python 整数参考，同时逐元素检查与 PyTorch FBGEMM 的差值不超过 1。CPU 和 NPU 的同步 BRAM 版本另有 `sim/tb_mynpu_soc_fpga.sv`，单端口 NPU 的独立回归是 `sim/tb_cnn_npu_sp.sv`。
 
 ## 参数与地址
 
@@ -47,7 +52,7 @@ python3 tools/run_sim.py --backend vcs --layout 8k --lanes 1
 |---|---:|---|
 | `CPU_SRAM_BYTES` | 8192 | CPU 程序、数据和栈容量 |
 | `NPU_SRAM_BYTES` | 8192 | NPU 参数、激活和描述符容量 |
-| `NPU_LANES` | 8 | 输出通道并行数 |
+| `NPU_LANES` | 8 | 功能数组 backend 的输出通道并行数；单端口 FPGA/ASIC backend 当前按 `LANES=1` 使用 |
 | `NPU_IRQ_ID` | 16 | 接入 CV32E40P 的中断编号 |
 | `CPU_INIT_FILE` | 空 | CPU RAM 仿真/FPGA 初始镜像 |
 | `NPU_INIT_FILE` | 空 | 可选 NPU RAM 初始镜像 |
@@ -67,7 +72,7 @@ CPU 固件当前对应 8KB CPU SRAM、中断 16；改变这两项须同步修改
 | `0x7000_4000` 起 | NPU SRAM 的 32-bit、小端访问窗口 |
 | `0x8000_1fc0 .. 0x8000_1fff` | 自测结果 mailbox |
 
-当前实现是两块独立的逻辑 SRAM。`SHARED_SRAM=1` 只规定 NPU BUSY 时忽略主机写本地数组，不代表 CPU 主存与 NPU 已共用一个物理 SRAM；共用物理宏需要进一步实现端口仲裁和延迟处理。
+当前默认 VCS 回归仍使用高并行功能 backend；FPGA/ASIC 版本通过 `USE_FPGA_BRAM=1` 或 `USE_ASIC_SRAM=1` 选择 CPU 与 NPU 的同步单端口 SRAM backend，此时建议 `NPU_LANES=1`。`SHARED_SRAM=1` 只规定 NPU BUSY 时忽略主机写本地存储，不代表 CPU 主存与 NPU 已共用一个物理 SRAM。
 
 ## 模型及整数运算
 
